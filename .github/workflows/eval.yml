@@ -1,0 +1,35 @@
+name: eval-and-test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run unit tests
+        run: pytest tests/ -v
+
+  eval:
+    runs-on: ubuntu-latest
+    needs: test
+    # Requires ANTHROPIC_API_KEY and EDGAR_USER_AGENT secrets set in repo settings,
+    # plus a pre-built index (data/index/) checked in or built in a prior step.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run eval harness (gates merge on faithfulness threshold)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python -m app.eval.run_eval
