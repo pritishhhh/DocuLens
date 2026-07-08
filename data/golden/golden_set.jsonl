@@ -1,0 +1,5 @@
+{"ticker": "NVDA", "question": "What was NVIDIA's total revenue in the most recent fiscal year reported?", "expected_answer_contains": "total revenue figure from the latest 10-K income statement", "type": "numeric_lookup"}
+{"ticker": "NVDA", "question": "How did NVIDIA's Data Center segment revenue trend over the last two fiscal years?", "expected_answer_contains": "year-over-year Data Center segment revenue comparison", "type": "trend_analysis"}
+{"ticker": "NVDA", "question": "What risk factors does NVIDIA cite related to supply chain concentration?", "expected_answer_contains": "supply chain / foundry concentration risk language from the 10-K risk factors section", "type": "qualitative_risk"}
+{"ticker": "NVDA", "question": "What was NVIDIA's gross margin in the most recent quarter?", "expected_answer_contains": "gross margin percentage from the income statement", "type": "numeric_lookup"}
+{"ticker": "NVDA", "question": "What does NVIDIA say about export control risk in its risk factors?", "expected_answer_contains": "export control / China trade restriction language", "type": "qualitative_risk"}

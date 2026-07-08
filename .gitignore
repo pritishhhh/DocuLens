@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.pyc
+.env
+data/filings/
+data/index/
+data/traces.jsonl
