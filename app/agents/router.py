@@ -1,11 +1,12 @@
-from app.llm import call_llm
-LABELS = ['numeric_lookup', 'trend_analysis', 'qualitative_risk']
-ROUTER_PROMPT = 'Classify the following financial-filing question into exactly one label:\n- numeric_lookup: asks for a specific number or figure at one point in time\n- trend_analysis: asks how a metric changed over multiple periods\n- qualitative_risk: asks about risk factors, strategy, or narrative/qualitative content\n\nQuestion: {question}\n\nRespond with only the label, nothing else.'
+"""A retrieval hint; every route still retrieves both text and tables."""
+import re
+
+LABELS = ("numeric_lookup", "trend_analysis", "qualitative_risk")
+
 
 def route(question: str) -> str:
-    resp = call_llm(ROUTER_PROMPT.format(question=question), max_tokens=20)
-    label = resp.strip().lower()
-    for l in LABELS:
-        if l in label:
-            return l
-    return 'qualitative_risk'
+    if re.search(r"\b(trend|change|grew|growth|compare|comparison|year.over.year|yoy|over time)\b", question, re.I):
+        return "trend_analysis"
+    if re.search(r"\b(how much|how many|what was|what were|revenue|margin|income|cash|percentage|total)\b", question, re.I):
+        return "numeric_lookup"
+    return "qualitative_risk"
