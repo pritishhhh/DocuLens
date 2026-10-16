@@ -33,6 +33,14 @@ def test_free_quota_error_does_not_retry():
     assert post.call_count == 1
 
 
+def test_provider_retry_delay_is_respected():
+    data = {"error": {"details": [{"retryDelay": "8.2s"}]}}
+    with patch("app.llm.requests.post", return_value=response(429, data)):
+        with pytest.raises(ProviderError) as error:
+            call_llm("hello")
+    assert error.value.retry_after == 10
+
+
 def test_embedding_normalization_and_retrieval_task():
     with patch("app.llm.requests.post", return_value=response(200, {"embeddings": [{"values": [3, 4]}]})) as post:
         assert embed(["text"], "RETRIEVAL_QUERY", dimensions=2) == [[0.6, 0.8]]

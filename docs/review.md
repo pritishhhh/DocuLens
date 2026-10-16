@@ -53,6 +53,15 @@ The original README claimed multimodal/ColPali retrieval, TAPEX-style table reas
 
 The replacement describes the implemented text/table pipeline, dated filing coverage, actual verification method, setup, deployment, and limits. The unused visual stub and unused heavyweight libraries were removed. The LangGraph wrapper was replaced with a small explicit workflow: retrieval, synthesis, verification, and one bounded expansion.
 
+## Validation
+
+- 56 offline tests cover parsing, provenance, retrieval filters, embedding-model consistency, cache reuse, provider failures, citation validation, abstention, and access controls.
+- All five pinned live reference checks passed with Gemini 3.5 Flash-Lite. This includes the two expected abstentions.
+- Four real NVIDIA filings were downloaded from EDGAR and parsed into 569 chunks. The browser returned fiscal 2026 revenue with a citation to the original filing table.
+- The Vercel configuration passed validation against the official schema; the code passed Python compilation, JavaScript syntax, and Ruff checks.
+- The isolated dependency audit reported no known vulnerabilities on October 16, 2026.
+- Live testing showed that Flash-Lite 2.5 was unavailable to this new-user project despite appearing in the model list. The default was updated to Flash-Lite 3.5 and tested successfully.
+
 ## Remaining limits
 
 - The same model family generates and reviews answers. Exact-quote validation catches invented evidence, but neither it nor an LLM judge proves entailment, arithmetic, or financial correctness.

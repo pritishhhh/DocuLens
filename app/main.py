@@ -55,7 +55,7 @@ def query(req: QueryRequest):
         raise HTTPException(503, str(exc)) from None
     except ProviderError as exc:
         raise HTTPException(exc.status_code, str(exc),
-                            headers={"Retry-After": "60"} if exc.status_code == 429 else None) from None
+                            headers={"Retry-After": str(exc.retry_after)} if exc.status_code == 429 else None) from None
     except (ValueError, KeyError, OSError):
         logging.getLogger("doculens").error("Corpus could not be read; rebuild the deployed index")
         raise HTTPException(503, "The filing corpus is unavailable. Rebuild the deployment index.") from None

@@ -16,9 +16,10 @@ _deadline = ContextVar("provider_deadline", default=None)
 
 
 class ProviderError(RuntimeError):
-    def __init__(self, message: str, status_code: int = 502):
+    def __init__(self, message: str, status_code: int = 502, retry_after: int = 60):
         super().__init__(message)
         self.status_code = status_code
+        self.retry_after = retry_after
 
 
 class InvalidModelOutput(ValueError):
@@ -39,7 +40,7 @@ def _post(model: str, method: str, payload: dict) -> dict:
         raise ValueError("Invalid Gemini model identifier")
     key = api_key()
     for attempt in range(2):
-        remaining = (_deadline.get() or (time.monotonic() + 45)) - time.monotonic()
+        remaining = (_deadline.get() or (time.monotonic() + 120)) - time.monotonic()
         if remaining < 2:
             raise ProviderError("The answer exceeded its time budget. Try a narrower question.", 504)
         try:
@@ -47,12 +48,21 @@ def _post(model: str, method: str, payload: dict) -> dict:
                 response = requests.post(
                     f"{BASE_URL}/{model}:{method}",
                     headers={"x-goog-api-key": key}, json=payload,
-                    timeout=(min(5, remaining / 4), min(30, remaining / 2)),
+                    timeout=(min(5, remaining / 4),
+                             min(60 if method == "batchEmbedContents" else 30, remaining / 2)),
                 )
         except requests.RequestException:
             raise ProviderError("The AI provider could not be reached. Please try again.") from None
         if response.status_code == 429:
-            raise ProviderError("Gemini's quota is exhausted. Check your free-tier limits and try later.", 429)
+            pause = 60
+            try:
+                for detail in response.json().get("error", {}).get("details", []):
+                    if "retryDelay" in detail:
+                        pause = min(60, max(1, math.ceil(float(detail["retryDelay"].removesuffix("s"))) + 1))
+            except (ValueError, TypeError, AttributeError, OverflowError):
+                pass
+            raise ProviderError("Gemini's quota is exhausted. Check your free-tier limits and try later.",
+                                429, retry_after=pause)
         if response.status_code >= 500 and attempt == 0:
             time.sleep(0.5)
             continue

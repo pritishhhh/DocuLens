@@ -77,7 +77,9 @@ def test_example_environment_contains_no_real_credentials():
     assert values["EDGAR_USER_AGENT"] == "Your name your-email@example.com"
 
 
-def test_embedding_build_resumes_cached_batches_and_handles_quota(tmp_path, monkeypatch):
+@pytest.mark.parametrize("failure_code,pause", [(429, 60), (502, 1), (504, 1)])
+def test_embedding_build_resumes_cached_batches_and_handles_provider_failures(
+        tmp_path, monkeypatch, failure_code, pause):
     root = tmp_path / "project"
     folder = root / "data" / "filings" / "EXM"
     folder.mkdir(parents=True)
@@ -88,11 +90,11 @@ def test_embedding_build_resumes_cached_batches_and_handles_quota(tmp_path, monk
     (folder / "annual.htm").write_text("<p>Revenue was USD 120 million.</p>")
     monkeypatch.setattr("app.ingestion.vectorstore.ROOT", root)
     vector = [1.0] + [0.0] * 767
-    with patch("app.ingestion.vectorstore.embed", side_effect=[ProviderError("quota", 429), [vector]]) as embed, \
+    with patch("app.ingestion.vectorstore.embed", side_effect=[ProviderError("provider", failure_code), [vector]]) as embed, \
             patch("app.ingestion.vectorstore.time.sleep") as sleep:
         build_index("EXM")
     assert embed.call_count == 2
-    sleep.assert_called_once_with(60)
+    sleep.assert_called_once_with(pause)
     with patch("app.ingestion.vectorstore.embed") as embed:
         build_index("EXM")
     embed.assert_not_called()

@@ -136,7 +136,7 @@ def build_index(ticker: str, lexical_only: bool = False, output: Path | None = N
                 except ProviderError as exc:
                     if exc.status_code not in (429, 502, 504) or quota_attempt == 2:
                         raise
-                    pause = 60 if exc.status_code == 429 else 2 ** quota_attempt
+                    pause = exc.retry_after if exc.status_code == 429 else 2 ** quota_attempt
                     print(f"Embedding provider unavailable; pausing {pause} seconds. Completed batches are saved.",
                           flush=True)
                     time.sleep(pause)
