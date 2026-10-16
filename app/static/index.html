@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Explore SEC filings with evidence-grounded answers and traceable citations.">
+  <title>DocuLens — Read between the filings.</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <header><a class="brand" href="/" aria-label="DocuLens home"><span class="mark">D<span>↗</span></span>DocuLens</a><span class="header-note"><span class="dot"></span> SEC filing intelligence</span><a class="repo" href="https://github.com/pritishhhh/DocuLens" target="_blank" rel="noopener noreferrer">View source ↗</a></header>
+  <main>
+    <section class="intro"><p class="eyebrow">EVIDENCE BEFORE ANSWERS</p><h1>Read between<br>the <em>filings.</em></h1><p class="lead">Ask a better question of the numbers.<br>Get an answer you can trace to the source.</p></section>
+    <div class="workspace">
+      <aside><p class="eyebrow">YOUR RESEARCH SCOPE</p><label for="ticker">Company</label><select id="ticker"><option value="">Loading filings…</option></select><label for="form">Filing type</label><select id="form"><option value="">Annual & quarterly</option><option value="10-K">10-K · Annual</option><option value="10-Q">10-Q · Quarterly</option></select><label for="filing-date">Filing date</label><select id="filing-date"><option value="">All indexed dates</option></select><div id="coverage" class="coverage"></div><div id="token-area" hidden><label for="token">Access token</label><input id="token" type="password" autocomplete="off" placeholder="Deployment access token"><p class="hint">Used only for this request. Never saved.</p></div><div class="scope-note">A focused view.<br><span>Answers cover the indexed filings shown here. The corpus is a snapshot, not a live EDGAR feed.</span></div></aside>
+      <section class="research"><div class="panel-heading"><span class="step">01 / ASK</span><span class="small">Source-grounded research</span></div><h2>What would you like to understand?</h2>
+        <form id="question-form"><label class="sr-only" for="question">Your question about the selected filings</label><textarea id="question" minlength="5" maxlength="2000" required placeholder="What does the company say about its supply chain risks?" rows="4"></textarea><div class="form-bottom"><span class="small">Be specific about metrics and fiscal periods.</span><button id="submit" type="submit" disabled>Find an answer <span>↗</span></button></div></form>
+        <div class="examples"><span class="small">Try a question</span><button type="button" data-question="What supply chain risks does the company identify?">Supply chain risks</button><button type="button" data-question="How did total revenue change between the fiscal periods in the indexed filings?">Revenue over time</button><button type="button" data-question="What was total revenue in the most recent fiscal year reported?">Annual revenue</button></div>
+        <p id="notice" role="status" aria-live="polite">Loading the indexed corpus…</p>
+        <section id="result" hidden aria-label="Research answer"><div class="panel-heading"><span class="step">02 / ANSWER</span><span id="answer-state" class="badge"></span></div><div id="answer"></div><p id="snapshot" class="small"></p><div id="sources"></div></section>
+        <div id="empty-state" class="empty-state"><div class="outline-icon">↗</div><h3>Follow the evidence.</h3><p>Every returned claim includes a citation.<br>Open its excerpt to inspect the original filing.</p></div>
+      </section>
+    </div>
+    <footer><span>Built for careful reading.</span><span>Automated answers can be wrong. Verify the cited filings.</span></footer>
+  </main>
+</body>
+</html>
