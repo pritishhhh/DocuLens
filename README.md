@@ -59,10 +59,10 @@ Indexes are rebuilt atomically from the download manifest. They live in `data/co
 
 ## Deploy on Vercel
 
-1. Import this repository into Vercel and select the **FastAPI** framework preset. Keep the repository root as the project root.
+1. Merge [PR #1](https://github.com/pritishhhh/DocuLens/pull/1), or deploy its `codex/rag-vercel-review` branch. Import the repository into Vercel and select the **FastAPI** framework preset. Keep the repository root as the project root.
 2. Set `GEMINI_API_KEY` in the Vercel environment variables.
 3. Set `DOCULENS_API_TOKEN` to restrict answer requests. For an intentionally public demo, set `DOCULENS_PUBLIC_DEMO=true` instead.
-4. Deploy. The checked-in filing corpus works immediately; include additional generated `data/corpus/*.json` files when deploying a larger corpus.
+4. Leave Build Command and Output Directory at their framework defaults and deploy. The configured build check validates the frontend and filing index without API calls. The checked-in corpus works immediately; include additional generated `data/corpus/*.json` files when deploying a larger corpus.
 
 The API key stays on the server. An access token, if configured, is entered in the interface or supplied as a bearer token. A public demo shares the owner's API quota; use Vercel Firewall rate limits for public traffic.
 

@@ -8,6 +8,8 @@ The server reads the corpus and serves the interface. It never downloads filings
 
 The deployment uses Python 3.12 or newer. There is no Node build, model checkpoint, GPU requirement, or external vector database.
 
+The build hook runs `python scripts/check_deployment.py`. It checks that the frontend files and serving indexes exist, chunk identities are unique, and semantic vectors have the correct dimensions and normalization. It does not require API credentials, contact SEC, or spend Gemini quota. An incomplete bundle fails the build with an actionable message.
+
 ## Environment variables
 
 | Variable | Purpose |
@@ -27,15 +29,17 @@ Use Vercel's environment-variable controls for secrets. Never put credentials in
 
 ## Deploy with Git
 
-1. Commit the code and the intended `data/corpus/*.json` files to your repository.
+1. Merge [PR #1](https://github.com/pritishhhh/DocuLens/pull/1) into `master`, or explicitly select `codex/rag-vercel-review` as the deployment branch. The fixes are on that branch until the PR is merged.
 2. Import the repository into Vercel.
-3. Select the FastAPI framework preset, repository root, and no custom frontend build command.
-4. Configure the environment variables.
+3. Select the FastAPI framework preset and repository root. Leave Build Command and Output Directory at their defaults so Vercel uses the configured Python build hook.
+4. Add `GEMINI_API_KEY` for the deployment environment. For a public demo, add `DOCULENS_PUBLIC_DEMO=true`. For restricted access, set `DOCULENS_API_TOKEN` instead. Index-building variables and `EDGAR_USER_AGENT` are not needed for deployment.
 5. Deploy and verify `/health`, `/corpus`, and a question supported by the corpus.
 
 The bundled NVDA corpus contains four filings: the fiscal 2026 10-K and the 10-Q filings for periods ended October 26, 2025, April 26, 2026, and July 26, 2026. The latest included filing was submitted August 26, 2026. The interface shows the exact coverage. Frozen fiscal 2025 summary excerpts in `data/reference/` are used only for repeatable evaluation.
 
 To demonstrate the bundled data, ask: **What was NVIDIA's revenue in fiscal year 2026, in billions of dollars?**
+
+Before importing, you can run `python scripts/check_deployment.py` locally. A successful `/health` response confirms process liveness; check `/corpus` and a supported question to verify the configured deployment. Keep `.env` local and enter secrets through Vercel's environment-variable settings.
 
 ## Refresh the corpus
 

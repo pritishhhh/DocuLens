@@ -26,7 +26,8 @@ jobs:
           python-version: ${{ matrix.python }}
           cache: pip
       - run: pip install -r requirements-dev.txt
-      - run: python -m ruff check app tests
+      - run: python -m ruff check app scripts tests
+      - run: python scripts/check_deployment.py
       - run: python -m pytest -q
       - run: python -m app.eval.run_eval
 
