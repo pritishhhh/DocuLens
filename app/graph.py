@@ -1,72 +1,81 @@
-from typing import TypedDict
-from langgraph.graph import END, StateGraph
+"""Bounded retrieval -> synthesis -> verification workflow.
+
+One retrieval expansion is allowed. Rejected answers are never returned.
+"""
+import re
+
 from app.agents.critic import critique
 from app.agents.router import route
 from app.agents.synthesis import synthesize
 from app.agents.table_agent import answer_from_tables
 from app.agents.text_retriever import retrieve_text
-MAX_RETRIES = 2
+from app.config import ticker_symbol
+from app.ingestion.vectorstore import HybridStore
+from app.llm import InvalidModelOutput, request_budget
+from app.tracing import trace_step
 
-class GraphState(TypedDict, total=False):
-    ticker: str
-    question: str
-    original_question: str
-    route_label: str
-    text_results: list
-    table_result: dict
-    answer: str
-    sources: list
-    context_used: str
-    critique: dict
-    retries: int
+MAX_RETRIES = 1
+ABSTENTION = ("I couldn't verify a complete answer from the indexed filings. "
+              "Try specifying a reporting period or adding the relevant filings.")
 
-def node_route(state: GraphState) -> GraphState:
-    label = route(state['question'])
-    return {**state, 'route_label': label}
 
-def node_retrieve(state: GraphState) -> GraphState:
-    text_results = retrieve_text(state['ticker'], state['question'])
-    table_result = None
-    if state['route_label'] in ('numeric_lookup', 'trend_analysis'):
-        table_result = answer_from_tables(state['ticker'], state['question'])
-    return {**state, 'text_results': text_results, 'table_result': table_result}
+def _period_filters(store, question, form, filing_date):
+    # Honor explicit filters. Resolve relative periods only within the snapshot.
+    if form is None:
+        if re.search(r"(latest|most recent|last)\s+(fiscal\s+)?(year|annual)", question, re.I):
+            form = "10-K"
+        elif re.search(r"(latest|most recent|last)\s+(fiscal\s+)?quarter", question, re.I):
+            form = "10-Q"
+    if filing_date is None and re.search(
+            r"\b(latest|most recent)\s+(?:(?:fiscal|reported)\s+)?(?:year|annual|quarter|filing)\b",
+            question, re.I):
+        matching = [c for c in store.data["chunks"] if form is None or c.get("form") == form]
+        if matching:
+            # Report period determines recency; filing date breaks ties.
+            latest = max(matching, key=lambda c: (c.get("report_date", ""), c.get("filing_date", "")))
+            filing_date = latest.get("filing_date") or None
+    return {"form": form, "filing_date": filing_date}
 
-def node_synthesize(state: GraphState) -> GraphState:
-    result = synthesize(state['question'], state['text_results'], state.get('table_result'))
-    return {**state, **result}
 
-def node_critique(state: GraphState) -> GraphState:
-    result = critique(state['question'], state['answer'], state['context_used'])
-    return {**state, 'critique': result}
-
-def edge_after_critique(state: GraphState) -> str:
-    if state['critique']['passed']:
-        return 'end'
-    if state.get('retries', 0) >= MAX_RETRIES:
-        return 'end'
-    return 'retry'
-
-def node_broaden_query(state: GraphState) -> GraphState:
-    broadened = f'{state['original_question']} (consider related sections and prior periods too)'
-    return {**state, 'question': broadened, 'retries': state.get('retries', 0) + 1}
-
-def build_graph():
-    g = StateGraph(GraphState)
-    g.add_node('route', node_route)
-    g.add_node('retrieve', node_retrieve)
-    g.add_node('synthesize', node_synthesize)
-    g.add_node('critique', node_critique)
-    g.add_node('broaden', node_broaden_query)
-    g.set_entry_point('route')
-    g.add_edge('route', 'retrieve')
-    g.add_edge('retrieve', 'synthesize')
-    g.add_edge('synthesize', 'critique')
-    g.add_conditional_edges('critique', edge_after_critique, {'end': END, 'retry': 'broaden'})
-    g.add_edge('broaden', 'route')
-    return g.compile()
-
-def ask(ticker: str, question: str) -> dict:
-    graph = build_graph()
-    initial: GraphState = {'ticker': ticker, 'question': question, 'original_question': question, 'retries': 0}
-    final_state = graph.invoke(initial)
-    return {'answer': final_state['answer'], 'sources': final_state['sources'], 'route': final_state['route_label'], 'critique': final_state['critique'], 'retries': final_state['retries']}
+def ask(ticker: str, question: str, form: str | None = None, filing_date: str | None = None) -> dict:
+    ticker = ticker_symbol(ticker)
+    store = HybridStore(ticker)
+    label = route(question)
+    filters = _period_filters(store, question, form, filing_date)
+    snapshot = {"ticker": ticker, "built_at": store.data["built_at"],
+                "coverage": store.data.get("coverage", "full indexed filings"),
+                "latest_filing_date": max(c.get("filing_date", "") for c in store.data["chunks"]),
+                "retrieval": "hybrid" if store.data.get("embedding_model") else "bm25",
+                "filters": filters, "scope": "indexed filings only"}
+    last_critique = {"passed": False, "method": "not_evaluated"}
+    with request_budget():
+        for attempt in range(MAX_RETRIES + 1):
+            with trace_step("retrieve", {"ticker": ticker, "attempt": attempt}):
+                k = 5 + attempt * 4
+                texts = retrieve_text(store, question, k=k, **filters)
+                tables = answer_from_tables(store, question, k=k, **filters)
+                ordered = (tables + texts if label != "qualitative_risk" else texts + tables)
+                selected, seen, chars = [], set(), 0
+                for result in ordered:
+                    if result["id"] in seen or chars + len(result["content"]) > 26000:
+                        continue
+                    selected.append(result)
+                    seen.add(result["id"])
+                    chars += len(result["content"])
+            if not selected:
+                break
+            try:
+                draft = synthesize(question, selected, snapshot)
+                if draft["insufficient_context"]:
+                    continue
+                last_critique = critique(question, draft["answer"], draft["context_used"])
+            except InvalidModelOutput:
+                last_critique = {"passed": False, "method": "validation", "reason": "invalid_model_output"}
+                continue
+            if last_critique["passed"]:
+                return {"status": "answered", "answer": draft["answer"], "sources": draft["sources"],
+                        "claims": draft["claims"], "route": label, "critique": last_critique,
+                        "retries": attempt, "snapshot": snapshot}
+    return {"status": "insufficient_evidence", "answer": ABSTENTION, "sources": [],
+            "claims": [], "route": label, "critique": last_critique,
+            "retries": attempt, "snapshot": snapshot}

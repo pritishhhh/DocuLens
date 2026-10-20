@@ -1,35 +1,52 @@
-name: eval-and-test
+name: checks
 
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      live_eval:
+        description: Run live reference checks against Gemini
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Run unit tests
-        run: pytest tests/ -v
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: python -m ruff check app scripts tests
+      - run: python scripts/check_deployment.py
+      - run: python -m pytest -q
+      - run: python -m app.eval.run_eval
 
-  eval:
-    runs-on: ubuntu-latest
+  live-eval:
+    if: github.event_name == 'workflow_dispatch' && inputs.live_eval
     needs: test
-    # Requires ANTHROPIC_API_KEY and EDGAR_USER_AGENT secrets set in repo settings,
-    # plus a pre-built index (data/index/) checked in or built in a prior step.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Run eval harness (gates merge on faithfulness threshold)
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Check API key
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python -m app.eval.run_eval
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python -c "from app.config import api_key; api_key()"
+      - name: Evaluate pinned reference questions
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python -m app.eval.run_eval --live

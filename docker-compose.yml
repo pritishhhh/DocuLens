@@ -1,11 +1,8 @@
-version: "3.9"
 services:
   doculens:
     build: .
     ports:
       - "8000:8000"
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - EDGAR_USER_AGENT=${EDGAR_USER_AGENT}
+    env_file: .env
     volumes:
-      - ./data:/app/data
+      - ./data/corpus:/app/data/corpus:ro

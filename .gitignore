@@ -1,7 +1,16 @@
+.venv/
 venv/
 __pycache__/
 *.pyc
 .env
+.env.*
+!.env.example
 data/filings/
 data/index/
 data/traces.jsonl
+.pytest_cache/
+.ruff_cache/
+.vercel/
+eval-results.json
+.pytest-*/
+dependency-audit.json
